@@ -1,9 +1,13 @@
 #Proyecto 2 Microprogramación - Diego Cordón - 1094021
    
     .data
-filename:   .asciiz "test.txt"           # Nombre del archivo de entrada
+filename:   .asciz "test.txt"           # Nombre del archivo de entrada
 buffer:     .space 100                   # Buffer para almacenar datos leídos
-output_file: .asciiz "Salida_Laberinto.txt" # Nombre del archivo de salida
+output_file: .asciz "Salida_Laberinto.txt" # Nombre del archivo de salida
+
+# Mensaje de éxito
+success_msg: .asciz "Salida exitosa\n"
+failure_msg: .asciz "Salida inaccesible\n"
 
 # Variables para almacenar información del laberinto
 rows:       .word 0                      # Filas del laberinto
@@ -41,20 +45,40 @@ _start:
     # Convertir primer número (filas)
 parse_rows:
     lb t3, 0(t0)                         # Leer un byte del buffer
-    beq t3, 0x20, parse_columns          # Si es espacio, pasar a columnas
-    sub t3, t3, 0x30                     # Convertir de ASCII a entero
-    mul t1, t1, 10                       # Multiplicar filas acumuladas por 10
+    
+    # Usamos un registro temporal para el valor ASCII de espacio (0x20)
+    li t4, 32                            # 0x20 en decimal
+    beq t3, t4, parse_columns            # Si es espacio, pasar a columnas
+    
+    # Convertimos de ASCII a entero restando 48 (ASCII '0' es 0x30 o 48)
+    li t4, 48                            # 0x30 en decimal
+    sub t3, t3, t4                       # Convertir de ASCII a entero
+    
+    # Multiplicación por 10 mediante sumas
+    slli t1, t1, 3                       # t1 * 8
+    add t1, t1, t1                       # t1 * 2 -> ahora es t1 * 10
     add t1, t1, t3                       # Agregar dígito actual
+
     addi t0, t0, 1                       # Avanzar al siguiente byte
     j parse_rows                         # Repetir para siguiente dígito
 
 parse_columns:
     addi t0, t0, 1                       # Avanzar para leer columnas
     lb t3, 0(t0)                         # Leer un byte del buffer
-    beq t3, 0x20, parse_entry_cell       # Si hay un espacio, pasar a entrada
-    sub t3, t3, 0x30                     # Convertir de ASCII a entero
-    mul t2, t2, 10                       # Multiplicar columnas acumuladas por 10
+    
+    # Usamos el mismo valor de espacio (32)
+    li t4, 32
+    beq t3, t4, parse_entry_cell         # Si hay un espacio, pasar a entrada
+    
+    # Convertimos de ASCII a entero
+    li t4, 48                            # 0x30 en decimal
+    sub t3, t3, t4                       # Convertir de ASCII a entero
+
+    # Multiplicación por 10 mediante sumas
+    slli t2, t2, 3                       # t2 * 8
+    add t2, t2, t2                       # t2 * 2 -> ahora es t2 * 10
     add t2, t2, t3                       # Agregar dígito actual
+
     addi t0, t0, 1                       # Avanzar al siguiente byte
     j parse_columns                      # Repetir para siguiente dígito
 
@@ -64,10 +88,20 @@ parse_entry_cell:
 
 parse_entry_num:
     lb t3, 0(t0)                         # Leer un byte del buffer
-    beq t3, 0x41, parse_entry_wall       # Si es 'A' o siguiente, leer pared
-    sub t3, t3, 0x30                     # Convertir de ASCII a entero
-    mul t4, t4, 10                       # Multiplicar celda acumulada por 10
+    
+    # Usamos un registro temporal para verificar si es 'A' o superior (0x41)
+    li t5, 65                            # 0x41 en decimal
+    bge t3, t5, parse_entry_wall         # Si es 'A' o siguiente, leer pared
+
+    # Convertimos de ASCII a entero
+    li t5, 48                            # 0x30 en decimal
+    sub t3, t3, t5                       # Convertir de ASCII a entero
+
+    # Multiplicación por 10 mediante sumas
+    slli t4, t4, 3                       # t4 * 8
+    add t4, t4, t4                       # t4 * 2 -> ahora es t4 * 10
     add t4, t4, t3                       # Agregar dígito actual
+
     addi t0, t0, 1                       # Avanzar al siguiente byte
     j parse_entry_num                    # Repetir para siguiente dígito
 
@@ -82,54 +116,101 @@ parse_exit_cell:
 
 parse_exit_num:
     lb t3, 0(t0)                         # Leer un byte del buffer
-    beq t3, 0x41, parse_exit_wall        # Si es 'A' o siguiente, leer pared
-    sub t3, t3, 0x30                     # Convertir de ASCII a entero
-    mul t6, t6, 10                       # Multiplicar celda acumulada por 10
+    
+    # Usamos el mismo valor de 'A' para verificar si es pared
+    li s1, 65                            # 0x41 en decimal
+    bge t3, s1, parse_exit_wall          # Si es 'A' o siguiente, leer pared
+
+    # Convertimos de ASCII a entero
+    li s1, 48                            # 0x30 en decimal
+    sub t3, t3, s1                       # Convertir de ASCII a entero
+
+    # Multiplicación por 10 mediante sumas
+    slli t6, t6, 3                       # t6 * 8
+    add t6, t6, t6                       # t6 * 2 -> ahora es t6 * 10
     add t6, t6, t3                       # Agregar dígito actual
+
     addi t0, t0, 1                       # Avanzar al siguiente byte
     j parse_exit_num                     # Repetir para siguiente dígito
 
+
 # Leer pared de celda de salida
 parse_exit_wall:
-    lb t7, 0(t0)                         # Leer pared de salida (A, B, C, D)
+    lb s1, 0(t0)                         # Leer pared de salida (A, B, C, D)
+
 
 # Guardar filas, columnas, entrada y salida
 store_labyrinth_data:
-    sw t1, rows                          # Guardar filas
-    sw t2, cols                          # Guardar columnas
-    sw t4, entry_cell                    # Guardar celda de entrada
-    sw t5, entry_wall                    # Guardar pared de entrada
-    sw t6, exit_cell                     # Guardar celda de salida
-    sw t7, exit_wall                     # Guardar pared de salida
+    la t0, rows                          # Cargar dirección de filas en t0
+    sw t1, 0(t0)                         # Guardar filas
+
+    la t0, cols                          # Cargar dirección de columnas en t0
+    sw t2, 0(t0)                         # Guardar columnas
+
+    la t0, entry_cell                    # Cargar dirección de celda de entrada en t0
+    sw t4, 0(t0)                         # Guardar celda de entrada
+
+    la t0, entry_wall                    # Cargar dirección de pared de entrada en t0
+    sw t5, 0(t0)                         # Guardar pared de entrada
+
+    la t0, exit_cell                     # Cargar dirección de celda de salida en t0
+    sw t6, 0(t0)                         # Guardar celda de salida
+
+    la t0, exit_wall                     # Cargar dirección de pared de salida en t0
+    sw s1, 0(t0)                         # Guardar pared de salida (usamos s1 en lugar de t7)
 
 # Leer celdas individuales y sus paredes
 parse_cells:
-    li t9, 0                             # Índice en `cell_walls` para cada celda
+    li s3, 0                             # Índice en `cell_walls` para cada celda
 
 parse_cell:
-    li t8, 0                             # Inicializar número de celda a 0
+    li s2, 0                             # Inicializar número de celda a 0
 
+#Corrección
 parse_cell_num:
     lb t3, 0(t0)                         # Leer un byte del buffer
-    beq t3, 0x30, end_parsing            # Si es '0', fin de celdas
-    bge t3, 0x41, parse_cell_walls       # Si es una letra, es pared
-    sub t3, t3, 0x30                     # Convertir de ASCII a entero
-    mul t8, t8, 10                       # Multiplicar celda acumulada por 10
-    add t8, t8, t3                       # Agregar dígito actual
+    
+    # Verificar si el byte leído es '0' (fin de celdas) o es una letra (A o superior)
+    li t4, 48                            # Cargar 0x30 en decimal (ASCII de '0')
+    beq t3, t4, end_parsing              # Si es '0', fin de celdas
+    
+    li t4, 65                            # Cargar 0x41 en decimal (ASCII de 'A')
+    bge t3, t4, parse_cell_walls         # Si es una letra, es pared
+
+    # Convertir de ASCII a entero
+    li t4, 48                            # 0x30 en decimal
+    sub t3, t3, t4                       # Convertir de ASCII a entero
+
+    # Multiplicación por 10 usando desplazamientos y sumas
+    slli s2, s2, 3                       # s2 * 8 (equivalente a multiplicación por 10)
+    add s2, s2, s2                       # s2 * 2, ahora s2 es s2 * 10
+    add s2, s2, t3                       # Agregar dígito actual
+
     addi t0, t0, 1                       # Avanzar al siguiente byte
     j parse_cell_num                     # Repetir para número completo
 
 # Leer y almacenar paredes abiertas de la celda
 parse_cell_walls:
-    sw t8, cell_walls(t9)                # Almacenar número de celda en `cell_walls`
-    addi t9, t9, 4                       # Avanzar en espacio para paredes
+    la t4, cell_walls                    # Cargar la dirección base de `cell_walls` en t4
+    add t4, t4, s3                       # Añadir el índice en `s3` al offset de `cell_walls`
+    sw s2, 0(t4)                         # Almacenar número de celda en `cell_walls`
+    addi s3, s3, 4                       # Avanzar en espacio para paredes
 
 parse_wall:
     lb t3, 0(t0)                         # Leer una pared (letra A, B, C, D)
-    blt t3, 0x41, next_cell              # Si es un número, pasar a la siguiente celda
-    sub t3, t3, 0x41                     # Convertir de letra a número (A=0, B=1, etc.)
-    sw t3, cell_walls(t9)                # Almacenar pared abierta
-    addi t9, t9, 4                       # Avanzar al siguiente espacio
+    
+    # Convertir 0x41 a decimal y usarlo en la comparación
+    li t5, 65                            # 0x41 en decimal
+    blt t3, t5, next_cell                # Si es un número, pasar a la siguiente celda
+    
+    # Convertir de letra a número (A=0, B=1, etc.)
+    sub t3, t3, t5                       # t3 = t3 - 65 (A=0, B=1, etc.)
+    
+    # Almacenar pared abierta en cell_walls usando la dirección base t4 y offset s3
+    add t4, t4, s3                       # Actualizar dirección de almacenamiento
+    sw t3, 0(t4)                         # Guardar pared en `cell_walls`
+    
+    addi s3, s3, 4                       # Avanzar en el espacio de `cell_walls`
     addi t0, t0, 1                       # Avanzar al siguiente byte en el buffer
     j parse_wall                         # Repetir para más paredes de la celda
 
@@ -145,8 +226,8 @@ navigate:
     beq t4, t3, found_exit
 
     # Aplicar la regla de la mano derecha
-    addi t7, t5, 1                       # Intentar girar a la derecha
-    andi t7, t7, 3                       # Modulo 4 para mantener dirección en rango
+    addi s4, t5, 1                       # Intentar girar a la derecha
+    andi s4, s4, 3                       # Modulo 4 para mantener dirección en rango
     jal check_wall                       # Comprobar pared derecha
     beqz a0, move_forward                # Si está abierta, moverse a la derecha
 
@@ -155,8 +236,8 @@ navigate:
     beqz a0, move_forward                # Si está abierta, avanzar recto
 
     # Si no es posible, intentar girar a la izquierda
-    addi t7, t5, -1
-    andi t7, t7, 3
+    addi s4, t5, -1
+    andi s4, s4, 3
     jal check_wall                       # Comprobar pared izquierda
     beqz a0, move_forward                # Si está abierta, moverse a la izquierda
 
@@ -167,34 +248,55 @@ navigate:
 move_forward:
     # Actualizar posición según la dirección
     jal update_position                  # Cambiar celda en la dirección de t5
-    addi t5, t7, 0                       # Actualizar dirección a la última movida
+    addi t5, s4, 0                       # Actualizar dirección a la última movida
     j navigate                           # Continuar navegación
 
-# Comprobar pared de la celda en la dirección especificada en t7
+# Comprobar pared de la celda en la dirección especificada en s4
 check_wall:
     li a0, 1                             # Valor predeterminado (cerrada)
-    mul t8, t4, 16                       # Dirección en memoria para la celda
-    add t8, t8, cell_walls               # Base de la celda en cell_walls
-    add t8, t8, t7                       # Direcciona pared específica
-    lw a0, 0(t8)                         # Leer estado de la pared (0 abierta, 1 cerrada)
+    
+    # Multiplicar t4 por 16 usando un desplazamiento de 4 bits
+    slli s5, t4, 4                       # Multiplicar t4 por 16 y guardar en s5
+    
+    # Cargar la dirección base de cell_walls en t6 y sumar s5
+    la t6, cell_walls                    # Cargar la dirección base de cell_walls en t6
+    add s5, s5, t6                       # Base de la celda en cell_walls
+    
+    # Sumar s4 para direccionar pared específica
+    add s5, s5, s4                       # Ajustar dirección para pared específica
+    lw a0, 0(s5)                         # Leer estado de la pared (0 abierta, 1 cerrada)
     ret
+
 
 # Actualizar posición en la dirección t5
 update_position:
-    lw t8, rows                          # Obtener cantidad de filas
-    lw t9, cols                          # Obtener cantidad de columnas
-    beq t5, 0, move_left                 # Si es 0, mover a la izquierda
-    beq t5, 1, move_up                   # Si es 1, mover hacia arriba
-    beq t5, 2, move_right                # Si es 2, mover a la derecha
-    beq t5, 3, move_down                 # Si es 3, mover hacia abajo
+    la t6, rows                          # Cargar dirección de rows en t6
+    lw s5, 0(t6)                         # Cargar cantidad de filas en s5
+
+    la t6, cols                          # Cargar dirección de cols en t6
+    lw s6, 0(t6)                         # Cargar cantidad de columnas en s6
+
+# Comparaciones para las direcciones
+    li s7, 0                             # Cargar 0 en s7
+    beq t5, s7, move_left                # Si es 0, mover a la izquierda
+    
+    li s7, 1                             # Cargar 1 en s7
+    beq t5, s7, move_up                  # Si es 1, mover hacia arriba
+    
+    li s7, 2                             # Cargar 2 en s7
+    beq t5, s7, move_right               # Si es 2, mover a la derecha
+    
+    li s7, 3                             # Cargar 3 en s7
+    beq t5, s7, move_down                # Si es 3, mover hacia abajo
     ret
+
 
 move_left:
     addi t4, t4, -1                      # Disminuir celda en 1
     ret
 
 move_up:
-    sub t4, t4, t9                       # Disminuir celda en una fila
+    sub t4, t4, s6                       # Disminuir celda en una fila (s6 almacena columnas)
     ret
 
 move_right:
@@ -202,8 +304,9 @@ move_right:
     ret
 
 move_down:
-    add t4, t4, t9                       # Aumentar celda en una fila
+    add t4, t4, s6                       # Aumentar celda en una fila (s6 almacena columnas)
     ret
+
 
 found_exit:
     # Abrir archivo de salida para escribir
@@ -215,9 +318,10 @@ found_exit:
     mv s0, a0
 
     # Escribir mensaje de éxito
-    la a1, success_msg
-    li a2, 17
+    la a1, success_msg                   # Cargar la dirección del mensaje de éxito
+    li a2, 15                            # Longitud del mensaje (ajusta según la longitud real del mensaje)
     ecall
+
 
     # Cerrar el archivo
     li a7, 57                            # Syscall para cerrar archivo
