@@ -1,7 +1,7 @@
 #Proyecto 2 Microprogramación - Diego Cordón - 1094021
    
     .data
-filename:   .asciz "test.txt"           # Nombre del archivo de entrada
+filename: .asciz "test.txt"  # Nombre del archivo de entrada
 buffer:     .space 100                   # Buffer para almacenar datos leídos
 output_file: .asciz "Salida_Laberinto.txt" # Nombre del archivo de salida
 
@@ -23,19 +23,37 @@ cell_walls: .space 400                   # Espacio para almacenar 100 celdas y s
     .text
     .globl _start
 _start:
-    # Abrir el archivo de entrada
-    li a7, 56                            # Syscall para abrir archivo
-    la a0, filename                      # Nombre del archivo de entrada
-    li a1, 0                             # Modo de lectura (O_RDONLY)
-    ecall
-    mv s0, a0                            # Guardar el descriptor de archivo en s0
+	# Abrir el archivo de entrada
+li a7, 56                            # Syscall para abrir archivo
+la a0, filename                      # Nombre del archivo de entrada
+li a1, 0                             # Modo de lectura (O_RDONLY)
+ecall
+bltz a0, error                       # Si a0 es negativo, hubo un error al abrir el archivo
+mv s0, a0                            # Guardar el descriptor de archivo en s0
 
+
+
+error:
+# Puedes agregar código aquí para manejar el error, o simplemente finalizar el programa.
+li a7, 93
+li a0, 1                             # Código de salida de error
+ecall
+    
+            
     # Leer el contenido del archivo en el buffer
-    li a7, 63                            # Syscall para leer
-    mv a0, s0                            # Descriptor de archivo
-    la a1, buffer                        # Buffer donde almacenar los datos
-    li a2, 100                           # Tamaño de datos a leer
-    ecall
+li a7, 63                            # Syscall para leer
+mv a0, s0                            # Descriptor de archivo
+la a1, buffer                        # Buffer donde almacenar los datos
+li a2, 100                           # Tamaño de datos a leer
+ecall
+
+# Confirmación de lectura de archivo
+li a7, 64                # Syscall para escribir en la consola
+li a0, 1                 # Descriptor de archivo para stdout (consola)
+la a1, success_msg       # Dirección del mensaje a imprimir
+li a2, 15                # Longitud del mensaje
+ecall
+
 
     # Extraer filas y columnas desde el buffer
     la t0, buffer                        # Apuntar al inicio del buffer
@@ -220,6 +238,14 @@ next_cell:
 end_parsing:
     # A partir de aquí, cada celda y sus paredes están almacenadas en `cell_walls`
 
+# Mensaje antes de comenzar la navegación
+li a7, 64                # Syscall para escribir en la consola
+li a0, 1                 # Descriptor de archivo para stdout (consola)
+la a1, success_msg       # Dirección del mensaje a imprimir
+li a2, 15                # Longitud del mensaje
+ecall
+
+
 navigate:
     # Revisar si estamos en la celda de salida
     lw t3, exit_cell
@@ -316,10 +342,20 @@ found_exit:
     li a2, 0x180
     ecall
     mv s0, a0
+    
+    
 
     # Escribir mensaje de éxito
     la a1, success_msg                   # Cargar la dirección del mensaje de éxito
     li a2, 15                            # Longitud del mensaje (ajusta según la longitud real del mensaje)
+    ecall
+
+# Mensaje de salida exitosa o inaccesible
+found_exit:
+    li a7, 64                # Syscall para escribir en la consola
+    li a0, 1                 # Descriptor de archivo para stdout (consola)
+    la a1, success_msg       # Dirección del mensaje a imprimir
+    li a2, 15                # Longitud del mensaje
     ecall
 
 
