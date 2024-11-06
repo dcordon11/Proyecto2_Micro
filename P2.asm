@@ -1,4 +1,5 @@
-#Proyecto 2 Microprogramación - Diego Cordón - 1094021
+
+
 
 .global programa
 .data 
