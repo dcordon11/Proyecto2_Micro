@@ -1,9 +1,8 @@
-#Recorrido Con filas y columnas, pero con salida
 
 .global programa
 .data
     buffer: .space 100
-    ruta: .string "test3.txt"
+    ruta: .string "test.txt"
     salida_path: .string "Salida_Laberinto.txt"  
     errorlectura: .string "No se ha podido abrir el archivo correctamente\n"
     filas_msg: .string "\nFilas: "
@@ -13,6 +12,13 @@
     recorrido_msg: .string "\nRecorrido: "
     exito_msg: .string "\nSalida exitosa\n"
     inaccesible_msg: .string "\nSalida inaccesible\n"
+    direccion_msg: .string "Intentando moverse a: "
+    derecha_msg: .string "Derecha\n"
+    arriba_msg: .string "Arriba\n"
+    izquierda_msg: .string "Izquierda\n"
+    abajo_msg: .string "Abajo\n"
+    indice_celda_msg: .string "Índice de la celda: "   # Mensaje para el índice de la celda
+    valor_pared_msg: .string "Valor de la pared guardada: "
     newline: .string "\n"
     
     filas: .word 0
@@ -22,11 +28,11 @@
 
 .text
 programa: 
-    # Inicia el buffer y límite de bytes
+    # Iniciar buffer y límite de bytes
     la s0, buffer
     li s1, 100
 
-# Lee el archivo y llenar buffer
+# Leer archivo y llenar buffer
 abrirarchivo:
     li a1, 0
     la a0, ruta
@@ -64,7 +70,7 @@ cerrararchivo:
     li t2, 0
     li t5, 10
     
-# Lee número de filas
+# Leer número de filas
 parse_filas:
     lb t3, 0(t0)
     li t4, 32
@@ -84,9 +90,9 @@ parse_filas:
 # Leer columnas
 salto_a_columnas:
     addi t0, t0, 1
-    j parseo_columnas
+    j parse_columnas
 
-parseo_columnas:
+parse_columnas:
     lb t3, 0(t0)
     li t4, 32
     beq t3, t4, almacenar_columnas
@@ -100,7 +106,7 @@ parseo_columnas:
     add t2, t2, t3
 
     addi t0, t0, 1
-    j parseo_columnas
+    j parse_columnas
 
 almacenar_columnas:
     la t0, filas
@@ -152,6 +158,14 @@ parse_paredes:
     sub t4, t4, t6                  # Convertir ASCII a valor numérico
     add t3, t3, t4                  # Sumar el segundo dígito para formar el índice de la celda
 
+    # Imprimir el índice de la celda para depuración
+    la a0, indice_celda_msg
+    li a7, 4
+    ecall
+    mv a0, t3                       # Imprimir índice de la celda
+    li a7, 1
+    ecall
+
     # Leer y convertir la letra de la pared
     addi t0, t0, 1                  # Avanzar al siguiente byte para leer la pared
     lb t4, 0(t0)                    # Leer la pared
@@ -161,13 +175,25 @@ parse_paredes:
     # Almacenar el valor de la pared en la matriz
     la t5, matriz                   # Cargar dirección base de la matriz
     li t6, 4                        # Tamaño de cada celda en bytes
-    mul t4, t3, t6                  # Calcular desplazamiento en la matriz usando t4
-    add t5, t5, t4                  # Calcular dirección de la celda
+    mul a2, t3, t6                  # Calcular desplazamiento en la matriz usando t3
+    add t5, t5, a2                  # Calcular dirección de la celda
     sw t4, 0(t5)                    # Guardar el valor de la pared en la celda
+
+    # Imprimir valor de la pared guardada para depuración
+    la a0, valor_pared_msg
+    li a7, 4
+    ecall
+    mv a0, t4                       # Imprimir valor de pared
+    li a7, 1
+    ecall
+
+    la a0, newline
+    li a7, 4
+    ecall
 
     addi t0, t0, 2                  # Avanzar dos posiciones en el buffer
     j parse_paredes                 # Repetir el proceso para la siguiente pared o celda
-
+    
 # Iniciar recorrido
 iniciar_recorrido:
     li t3, 6
@@ -206,13 +232,15 @@ mover_celda:
     add t5, t5, t4
     lw t6, 0(t5)
 
-    la a0, valor_elemento_msg
+    # Imprimir valor de pared de la celda actual
+    la a0, valor_pared_msg
     li a7, 4
     ecall
     mv a0, t6
     li a7, 1
     ecall
 
+    # Decidir dirección basada en valor de pared
     li t4, 0
     beq t6, t4, mover_derecha
 
@@ -225,20 +253,49 @@ mover_celda:
     li t4, 3
     beq t6, t4, mover_abajo
 
+    # Si el valor no coincide con ninguna pared, continuar o finalizar.
+    j verificar_salida
 # Movimiento hacia la derecha
 mover_derecha:
+    la a0, direccion_msg
+    li a7, 4
+    ecall
+    la a0, derecha_msg
+    li a7, 4
+    ecall
     addi t3, t3, 1
     j verificar_salida
 
+# Movimiento hacia arriba
 mover_arriba:
+    la a0, direccion_msg
+    li a7, 4
+    ecall
+    la a0, arriba_msg
+    li a7, 4
+    ecall
     sub t3, t3, t2
     j verificar_salida
 
+# Movimiento hacia la izquierda
 mover_izquierda:
+    la a0, direccion_msg
+    li a7, 4
+    ecall
+    la a0, izquierda_msg
+    li a7, 4
+    ecall
     addi t3, t3, -1
     j verificar_salida
 
+# Movimiento hacia abajo
 mover_abajo:
+    la a0, direccion_msg
+    li a7, 4
+    ecall
+    la a0, abajo_msg
+    li a7, 4
+    ecall
     add t3, t3, t2
     j verificar_salida
 
@@ -274,4 +331,4 @@ imprimeerrorlectura:
     la a0, errorlectura
     li a7, 4
     ecall
-    j finalizar 
+    j finalizar
