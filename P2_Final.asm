@@ -5,7 +5,7 @@
 .global programa
 .data
     buffer: .space 100
-    ruta: .string "test3.txt"
+    ruta: .string "test.txt"
     salida_path: .string "Salida_Laberinto.txt"  
     errorlectura: .string "No se ha podido abrir el archivo correctamente\n"
     filas_msg: .string "\nFilas: "
