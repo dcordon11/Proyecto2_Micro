@@ -1,8 +1,9 @@
+#Recorrido Con filas y columnas, pero con salida
 
 .global programa
 .data
     buffer: .space 100
-    ruta: .string "test.txt"
+    ruta: .string "test2.txt"
     salida_path: .string "Salida_Laberinto.txt"  
     errorlectura: .string "No se ha podido abrir el archivo correctamente\n"
     filas_msg: .string "\nFilas: "
@@ -167,20 +168,6 @@ parse_paredes:
     addi t0, t0, 2                  # Avanzar dos posiciones en el buffer
     j parse_paredes                 # Repetir el proceso para la siguiente pared o celda
 
-# Abrir o crear el archivo de salida
-abrir_salida:
-    la a0, salida_path           # Ruta del archivo de salida
-    li a1, 1                     # Modo de escritura
-    li a2, 420                   # Permisos del archivo
-    li a7, 1024                  # Syscall para abrir/crear archivo
-    ecall
-    mv s2, a0                    # Guardar descriptor del archivo
-
-    # Verificar si el archivo se abrió correctamente
-    bltz s2, error_escritura     # Si el descriptor es negativo, mostrar error y finalizar
-
-    j iniciar_recorrido          # Continuar con el recorrido una vez abierto el archivo
-
 # Iniciar recorrido
 iniciar_recorrido:
     li t3, 6
@@ -193,55 +180,20 @@ iniciar_recorrido:
     
     j guardar_recorrido
     
-# Guardar cada paso en el recorrido y escribir en el archivo de salida
 guardar_recorrido:
     la t5, recorrido
     add t5, t5, t0
     sw t3, 0(t5)
     addi t0, t0, 4
 
-    # Convertir el valor de t3 a texto para el archivo de salida
-    la a0, buffer               # Dirección del buffer
-    li t1, 48                   # ASCII '0'
-    li t4, 10                   # Usar t4 para el valor 10
-
-    # División manual para obtener decenas y unidades
-    div t6, t3, t4              # Obtener decena en t6
-    mul a2, t6, t4              # Multiplicar decena por 10 para calcular el resto
-    sub a2, t3, a2              # Resto, que es la unidad
-
-    # Convertir decenas y unidades a ASCII
-    add t6, t6, t1              # Convertir decena a ASCII
-    add a2, a2, t1              # Convertir unidad a ASCII
-
-    # Guardar decena y unidad en el buffer
-    sb t6, 0(a0)                # Guardar decena en buffer
-    sb a2, 1(a0)                # Guardar unidad en buffer
-
-    # Usar t6 para espacio ASCII
-    li t6, 32                   # Espacio en ASCII
-    sb t6, 2(a0)                # Espacio después del número
-    sb zero, 3(a0)              # Terminador nulo
-
-    # Escribir el paso en el archivo
-    la a0, buffer               # Dirección del buffer
-    mv a1, s2                   # Descriptor del archivo
-    li a2, 3                    # Longitud de 3 caracteres ("XX ")
-    li a7, 64                   # Syscall para escribir en archivo
+    la a0, valor_posicion_msg
+    li a7, 4
+    ecall
+    mv a0, t3
+    li a7, 1
     ecall
 
-    # Verificar errores en la escritura
-    bltz a0, error_escritura     # Manejar error de escritura si ocurre
-
-    j mover_celda                # Proceder al siguiente movimiento 
-
-# Manejo de error de escritura
-error_escritura:
-    la a0, errorlectura          # Mensaje de error
-    li a7, 4                     # Imprimir mensaje de error en pantalla
-    ecall
-    j finalizar                  # Terminar el programa si hay un error
-
+    j mover_celda
 
 mover_celda:
     la a0, newline
@@ -302,28 +254,15 @@ verificar_salida:
     beq t3, t4, fin_recorrido
     j guardar_recorrido
 
-# Mensaje de éxito en archivo de salida
 exito:
     la a0, exito_msg
-    mv a1, s2
-    li a2, 16                       # Longitud del mensaje
-    li a7, 64
+    li a7, 4
     ecall
-    j cerrar_salida
+    j finalizar
 
-# Mensaje de inaccesibilidad en archivo de salida
 fin_recorrido:
     la a0, inaccesible_msg
-    mv a1, s2
-    li a2, 19                       # Longitud del mensaje
-    li a7, 64
-    ecall
-    j cerrar_salida
-
-# Cerrar archivo de salida
-cerrar_salida:
-    mv a0, s2
-    li a7, 57
+    li a7, 4
     ecall
     j finalizar
 
